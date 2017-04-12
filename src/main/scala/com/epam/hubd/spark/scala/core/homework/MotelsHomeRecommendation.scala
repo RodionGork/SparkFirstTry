@@ -27,6 +27,8 @@ object MotelsHomeRecommendation {
   def processData(sc: SparkContext, bidsPath: String, motelsPath: String, exchangeRatesPath: String, outputBasePath: String) = {
     val rawBids: RDD[List[String]] = getRawBids(sc, bidsPath)
     getErroneousRecords(rawBids).saveAsTextFile(outputBasePath)
+    val exch = getExchangeRates(sc, exchangeRatesPath)
+    sc.parallelize(exch.toList).saveAsTextFile(outputBasePath + ".e")
   }
 
   def processData1(sc: SparkContext, bidsPath: String, motelsPath: String, exchangeRatesPath: String, outputBasePath: String) = {
@@ -91,7 +93,11 @@ object MotelsHomeRecommendation {
     return counts.map(kv => kv._1 + "," + kv._2)
   }
 
-  def getExchangeRates(sc: SparkContext, exchangeRatesPath: String): Map[String, Double] = ???
+  def getExchangeRates(sc: SparkContext, exchangeRatesPath: String): Map[String, Double] = {
+    val lines = sc.textFile(exchangeRatesPath).map(_.split(",").map(_.trim))
+    val array = lines.map(line => (line(0), line(3).toDouble)).collect
+    return array.toMap
+  }
 
   def getBids(rawBids: RDD[List[String]], exchangeRates: Map[String, Double]): RDD[BidItem] = ???
 
