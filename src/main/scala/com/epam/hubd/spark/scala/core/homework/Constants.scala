@@ -1,6 +1,6 @@
 package com.epam.hubd.spark.scala.core.homework
 
-import org.joda.time.format.DateTimeFormat
+import java.text.SimpleDateFormat
 
 object Constants {
 
@@ -12,6 +12,6 @@ object Constants {
 
   val TARGET_LOSAS = Seq("US", "CA", "MX")
 
-  val INPUT_DATE_FORMAT = DateTimeFormat.forPattern("HH-dd-MM-yyyy")
-  val OUTPUT_DATE_FORMAT = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm")
+  val INPUT_DATE_FORMAT = new SimpleDateFormat("HH-dd-MM-yyyy")
+  val OUTPUT_DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm")
 }
