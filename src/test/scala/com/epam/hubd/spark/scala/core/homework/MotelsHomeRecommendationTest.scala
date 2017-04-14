@@ -11,6 +11,8 @@ import org.apache.spark.{SparkConf, SparkContext}
 import org.junit._
 import org.junit.rules.TemporaryFolder
 
+import com.epam.hubd.spark.scala.core.homework.domain.{BidItem, EnrichedItem}
+
 /**
   * Created by Csaba_Bejan on 8/17/2016.
   */
@@ -75,7 +77,34 @@ class MotelsHomeRecommendationTest {
     RDDComparisons.assertRDDEquals(expected, erroneousRecords)
   }
 
-
+  @Test
+  def shouldSplitBidsAndConvertCurrency() = {
+    val rawBids = sc.parallelize(
+      Seq(
+        List("1", "06-05-02-2016", "ERROR_1"),
+        List("2", "15-04-08-2016", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6"),
+        List("3", "07-05-02-2016", "ERROR_2"),
+        List("4", "16-04-08-2016", "1.6", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5")
+      )
+    )
+    val exch = Seq(
+        ("06-05-02-2016", 1.1),
+        ("15-04-08-2016", 0.9),
+        ("03-05-02-2016", 1.3)
+    ).toMap
+    
+    val bids = MotelsHomeRecommendation.getBids(rawBids, exch)
+    
+    val expected = sc.parallelize(
+      Seq(
+        BidItem("2", "2016-08-04 15:00", "US", 1.3 * 0.9),
+        BidItem("2", "2016-08-04 15:00", "MX", 1.4 * 0.9),
+        BidItem("2", "2016-08-04 15:00", "CA", 1.6 * 0.9)
+      )
+    )
+    RDDComparisons.assertRDDEquals(expected, bids)
+  }
+  
 //  @Test
   def shouldFilterErrorsAndCreateCorrectAggregates() = {
 

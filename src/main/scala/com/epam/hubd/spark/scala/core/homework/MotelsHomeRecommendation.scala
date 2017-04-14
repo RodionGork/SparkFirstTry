@@ -103,8 +103,10 @@ object MotelsHomeRecommendation {
   }
 
   def getEnriched(bids: RDD[BidItem], motels: RDD[(String, String)]): RDD[EnrichedItem] = {
-    bids.map(bi => (bi.motelId, bi)).join(motels.map(m => (m._1, m)))
-            .map(bm => EnrichedItem(bm._2._2._2, bm._1, bm._2._1.bidDate, bm._2._1.loSa, bm._2._1.price))
+    val allEnriched = bids.map(bi => (bi.motelId, bi)).join(motels.map(m => (m._1, m)))
+        .map(bm => EnrichedItem(bm._2._2._2, bm._1, bm._2._1.bidDate, bm._2._1.loSa, bm._2._1.price))
+    val keyed = allEnriched.map(ei => (ei.motelId, ei.bidDate) -> ei)
+    return keyed.reduceByKey((u, v) => if (u.price > v.price) u else v).map(_._2)
   }
   
 }
