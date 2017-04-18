@@ -1,11 +1,17 @@
 package com.epam.hubd.spark.scala.core.util
 
 import org.apache.spark.rdd.RDD
+import com.holdenkarau.spark.testing.RDDComparisons
+
+import org.scalatest.exceptions.TestFailedException
+
+import scala.reflect.ClassTag
 
 /**
   * Created by Csaba_Bejan on 8/30/2016.
   */
 object RddComparator {
+
   def printDiff(expected: RDD[String], actual: RDD[String]) = {
     val actualArray = actual.collect
     val expectedArray = expected.collect
@@ -22,4 +28,17 @@ object RddComparator {
       println("There were no differences between expected and actual RDDs")
     }
   }
+  
+  def assertEquals[T: ClassTag](expected: RDD[T], actual: RDD[T]) = {
+    try {
+      RDDComparisons.assertRDDEquals(expected, actual)
+    } catch {
+      case _ : TestFailedException =>
+        throw new RuntimeException("RDDs are not equal:\nexpected =\n"
+            + expected.collect.toList
+            + "\nactual =\n"
+            + actual.collect.toList)
+    }
+  }
+  
 }

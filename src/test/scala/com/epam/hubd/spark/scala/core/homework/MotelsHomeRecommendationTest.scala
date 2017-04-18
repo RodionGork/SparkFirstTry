@@ -10,6 +10,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.{SparkConf, SparkContext}
 import org.junit._
 import org.junit.rules.TemporaryFolder
+import org.scalatest.exceptions.TestFailedException
 
 import com.epam.hubd.spark.scala.core.homework.domain.{BidItem, EnrichedItem}
 
@@ -34,7 +35,7 @@ class MotelsHomeRecommendationTest {
   private var outputFolder: File = null
 
   @Before
-  def setup() = {
+  def setup() : Unit = {
     outputFolder = temporaryFolder.newFolder("output")
   }
 
@@ -78,11 +79,11 @@ class MotelsHomeRecommendationTest {
   }
 
   @Test
-  def shouldSplitBidsAndConvertCurrency() = {
+  def getBids_splitsLinesAndMultipliesByRate() = {
     val rawBids = sc.parallelize(
       Seq(
         List("1", "06-05-02-2016", "ERROR_1"),
-        List("2", "15-04-08-2016", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5", "1.6"),
+        List("2", "15-04-08-2016", "1.0", "1.1", "1.2", "1.3", "", "1.5", "1.6"),
         List("3", "07-05-02-2016", "ERROR_2"),
         List("4", "16-04-08-2016", "1.6", "1.0", "1.1", "1.2", "1.3", "1.4", "1.5")
       )
@@ -98,14 +99,46 @@ class MotelsHomeRecommendationTest {
     val expected = sc.parallelize(
       Seq(
         BidItem("2", "2016-08-04 15:00", "US", 1.3 * 0.9),
-        BidItem("2", "2016-08-04 15:00", "MX", 1.4 * 0.9),
         BidItem("2", "2016-08-04 15:00", "CA", 1.6 * 0.9)
       )
     )
-    RDDComparisons.assertRDDEquals(expected, bids)
+    
+    RddComparator.assertEquals(expected, bids)
   }
   
-//  @Test
+  @Test
+  def getEnriched_addsNamesAndSelectsMaximum() = {
+    val bidItems = sc.parallelize(
+      Seq(
+        BidItem("2", "2016-08-04 15:00", "US", 3.14),
+        BidItem("2", "2016-08-04 15:00", "MX", 1.41),
+        BidItem("2", "2016-08-04 15:00", "CA", 4.16),
+        BidItem("3", "2016-08-05 15:00", "MX", 1.59),
+        BidItem("3", "2016-08-05 15:00", "CA", 5.93),
+        BidItem("4", "2016-08-07 15:00", "US", 9.27)
+      )
+    )
+    val motels = sc.parallelize(
+      Seq(
+        ("2", "Uncle Tom's Hut"),
+        ("3", "Dead Mountainer's Hotel"),
+        ("5", "Emerald City")
+      )
+    )
+    
+    val expected = sc.parallelize(
+      Seq(
+        EnrichedItem("3", "Dead Mountainer's Hotel", "2016-08-05 15:00", "CA", 5.93),
+        EnrichedItem("2", "Uncle Tom's Hut", "2016-08-04 15:00", "CA", 4.16)
+      )
+    )
+    
+    val enriched = MotelsHomeRecommendation.getEnriched(bidItems, motels)
+
+    RddComparator.assertEquals(expected, enriched)
+  }
+  
+  @Test
   def shouldFilterErrorsAndCreateCorrectAggregates() = {
 
     runIntegrationTest()
@@ -128,9 +161,17 @@ class MotelsHomeRecommendationTest {
   }
 
   private def assertRddTextFiles(expectedPath: String, actualPath: String) = {
+    // this approach is a perfect bool-sheet due to comparison of doubles in awkward text format
+    // but as it came with the homework
+    // I dare not change it :(
     val expected = sc.textFile(expectedPath)
     val actual = sc.textFile(actualPath)
-    RDDComparisons.assertRDDEquals(expected, actual)
+    try {
+      RDDComparisons.assertRDDEquals(expected, actual)
+    } catch {
+      case _ : TestFailedException =>
+        throw new RuntimeException(s"RDD files differ: $expectedPath and $actualPath")
+    }
   }
 
   private def printRddDifferences(expectedPath: String, actualPath: String) = {

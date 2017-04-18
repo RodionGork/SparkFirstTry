@@ -8,6 +8,7 @@ object MotelsHomeRecommendation {
 
   val ERRONEOUS_DIR: String = "erroneous"
   val AGGREGATED_DIR: String = "aggregated"
+  val LOSA_PREFERENCE: String = "US CA MX"
 
   def main(args: Array[String]): Unit = {
     require(args.length == 4, "Provide parameters in this order: bidsPath, motelsPath, exchangeRatesPath, outputBasePath")
@@ -25,16 +26,6 @@ object MotelsHomeRecommendation {
   }
 
   def processData(sc: SparkContext, bidsPath: String, motelsPath: String, exchangeRatesPath: String, outputBasePath: String) = {
-    val rawBids: RDD[List[String]] = getRawBids(sc, bidsPath)
-    getErroneousRecords(rawBids).saveAsTextFile(outputBasePath + ".err")
-    val exch = getExchangeRates(sc, exchangeRatesPath)
-    val bids = getBids(rawBids, exch)
-    val motels = getMotels(sc, motelsPath)
-    val enriched = getEnriched(bids, motels)
-    enriched.saveAsTextFile(outputBasePath + ".rich")
-  }
-
-  def processData1(sc: SparkContext, bidsPath: String, motelsPath: String, exchangeRatesPath: String, outputBasePath: String) = {
 
     val rawBids: RDD[List[String]] = getRawBids(sc, bidsPath)
 
@@ -73,6 +64,7 @@ object MotelsHomeRecommendation {
   }
 
   def getBids(rawBids: RDD[List[String]], exchangeRates: Map[String, Double]): RDD[BidItem] = {
+    // these "+Ne-10" additions serve to ensure choosing the leftmost LoSa if the prices are equal
     val bidsByLosa = rawBids.filter(!isErroneousRecord(_)).flatMap(
             b => List((b(0), b(1), "US", b(5)), (b(0), b(1), "MX", b(6)), (b(0), b(1), "CA", b(8))))
     val bidsFiltered = bidsByLosa
@@ -90,7 +82,8 @@ object MotelsHomeRecommendation {
   }
   
   def reformatDate(v: String): String = {
-    return Constants.OUTPUT_DATE_FORMAT.format(Constants.INPUT_DATE_FORMAT.parse(v))
+    val dateTime = Constants.INPUT_DATE_FORMAT.parse(v)
+    Constants.OUTPUT_DATE_FORMAT.format(dateTime)
   }
 
   def getMotels(sc:SparkContext, motelsPath: String): RDD[(String, String)] = {
@@ -104,9 +97,19 @@ object MotelsHomeRecommendation {
 
   def getEnriched(bids: RDD[BidItem], motels: RDD[(String, String)]): RDD[EnrichedItem] = {
     val allEnriched = bids.map(bi => (bi.motelId, bi)).join(motels.map(m => (m._1, m)))
-        .map(bm => EnrichedItem(bm._2._2._2, bm._1, bm._2._1.bidDate, bm._2._1.loSa, bm._2._1.price))
+        .map(bm => EnrichedItem(bm._1, bm._2._2._2, bm._2._1.bidDate, bm._2._1.loSa, bm._2._1.price))
     val keyed = allEnriched.map(ei => (ei.motelId, ei.bidDate) -> ei)
-    return keyed.reduceByKey((u, v) => if (u.price > v.price) u else v).map(_._2)
+    return keyed.reduceByKey((u, v) => if (comparePricesAndPlaces(u, v) > 0) u else v).map(_._2)
+  }
+  
+  def comparePricesAndPlaces(u: EnrichedItem, v: EnrichedItem) : Int = {
+    // don't want to move it to dedicated comparator since it only makes sense for same id and date
+    if (u.price > v.price)
+      1
+    else if (u.price < v.price)
+      -1
+    else
+      LOSA_PREFERENCE.indexOf(v.loSa) - LOSA_PREFERENCE.indexOf(u.loSa)
   }
   
 }
