@@ -4,19 +4,18 @@ import java.io.File
 
 import com.epam.hubd.spark.scala.sql.homework.MotelsHomeRecommendation.{AGGREGATED_DIR, ERRONEOUS_DIR}
 import com.epam.hubd.spark.scala.sql.homework.MotelsHomeRecommendationTest._
-import org.apache.spark.sql.{DataFrame, UserDefinedFunction}
-import com.holdenkarau.spark.testing.DataFrameSuiteBase
+import org.apache.spark.sql.{Row, DataFrame, UserDefinedFunction}
+import org.apache.spark.sql.types.{StringType, IntegerType, DoubleType}
+import com.holdenkarau.spark.testing.RDDComparisons
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.{SparkConf, SparkContext}
 import org.junit._
 import org.junit.rules.TemporaryFolder
 
-/**
-  * Created by Csaba_Bejan on 8/22/2016.
-  */
-class MotelsHomeRecommendationTest extends DataFrameSuiteBase {
+class MotelsHomeRecommendationTest {
   val _temporaryFolder = new TemporaryFolder
+  val dataFrameUtils = new DataFrameTestUtils(sc, sqlContext)
 
   @Rule
   def temporaryFolder = _temporaryFolder
@@ -37,28 +36,30 @@ class MotelsHomeRecommendationTest extends DataFrameSuiteBase {
     outputFolder = temporaryFolder.newFolder("output")
   }
 
-@Test
+  @Test
   def shouldCollectErroneousRecords() = {
-    import sqlContext.implicits._
-    val rawBids = sc.parallelize(Seq(
-      List("1", "06-05-02-2016", "ERROR_1"),
-      List("2", "15-04-08-2016", "0.89"),
-      List("3", "07-05-02-2016", "ERROR_2"),
-      List("4", "06-05-02-2016", "ERROR_1"),
-      List("5", "06-05-02-2016", "ERROR_2")
-    )).toDF
-
-    val expected = sc.parallelize(Seq(
-      List("06-05-02-2016,ERROR_1", "2"),
-      List("06-05-02-2016,ERROR_2", "1"),
-      List("07-05-02-2016,ERROR_2", "1")
-    )).toDF
+    val rawBids = dataFrameUtils.createDataFrame(Seq(
+      Row("1", "06-05-02-2016", "ERROR_1"),
+      Row("2", "15-04-08-2016", "0.89"),
+      Row("3", "07-05-02-2016", "ERROR_2"),
+      Row("4", "06-05-02-2016", "ERROR_1"),
+      Row("5", "06-05-02-2016", "ERROR_2")
+    ), Seq(
+      ("MotelID", StringType, false),
+      ("BidDate", StringType, false),
+      ("Error", StringType, false)
+    ))
+    
+    val expected = dataFrameUtils.createDataFrame(Seq(
+      Row("06-05-02-2016,ERROR_1", 2),
+      Row("06-05-02-2016,ERROR_2", 1),
+      Row("07-05-02-2016,ERROR_2", 1)
+    ), Seq(("dateAndError", StringType, false), ("count", IntegerType, false)))
 
     val erroneousRecords = MotelsHomeRecommendation.getErroneousRecords(rawBids)
-
-    assertDataFrameEquals(expected, erroneousRecords)
+    dataFrameUtils.assertEquals(expected, erroneousRecords)
   }
-
+  
   //@Test
   def shouldFilterErrorsAndCreateCorrectAggregates() = {
 
