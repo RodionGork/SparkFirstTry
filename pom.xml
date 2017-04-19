@@ -15,22 +15,17 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.10</artifactId>
-            <version>2.1.0</version>
+            <version>1.6.2</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.10</artifactId>
-            <version>2.1.0</version>
+            <version>1.6.2</version>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-hive_2.10</artifactId>
-            <version>2.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.github.nscala-time</groupId>
-            <artifactId>nscala-time_2.10</artifactId>
-            <version>2.12.0</version>
+            <version>1.6.2</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
@@ -49,7 +44,7 @@
     <build>
         <sourceDirectory>src/main/scala</sourceDirectory>
         <testSourceDirectory>src/test/scala</testSourceDirectory>
-        <finalName>spark-core-hw</finalName>
+        <finalName>spark-sql-hw</finalName>
         <plugins>
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
@@ -63,6 +58,18 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>2.4</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.epam.hubd.spark.scala.sql.homework.MotelsHomeRecommendation</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
             </plugin>
         </plugins>
     </build>
