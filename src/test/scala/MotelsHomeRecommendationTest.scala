@@ -15,6 +15,8 @@ import org.junit.rules.TemporaryFolder
 
 class MotelsHomeRecommendationTest {
   val _temporaryFolder = new TemporaryFolder
+  val sqlContext = new HiveContext(sc)
+  import sqlContext.implicits._
   val dataFrameUtils = new DataFrameTestUtils(sc, sqlContext)
 
   @Rule
@@ -37,26 +39,23 @@ class MotelsHomeRecommendationTest {
   }
 
   @Test
-  def shouldCollectErroneousRecords() = {
-    val rawBids = dataFrameUtils.createDataFrame(Seq(
-      Row("1", "06-05-02-2016", "ERROR_1"),
-      Row("2", "15-04-08-2016", "0.89"),
-      Row("3", "07-05-02-2016", "ERROR_2"),
-      Row("4", "06-05-02-2016", "ERROR_1"),
-      Row("5", "06-05-02-2016", "ERROR_2")
-    ), Seq(
-      ("MotelID", StringType, false),
-      ("BidDate", StringType, false),
-      ("Error", StringType, false)
-    ))
+  def test_getErroneousRecords() = {
+    val rawBids = Seq(
+      ("1", "06-05-02-2016", "ERROR_1"),
+      ("2", "15-04-08-2016", "0.89"),
+      ("3", "07-05-02-2016", "ERROR_2"),
+      ("4", "06-05-02-2016", "ERROR_1"),
+      ("5", "06-05-02-2016", "ERROR_2")
+    ).toDF("MotelID", "BidDate", "Error")
     
-    val expected = dataFrameUtils.createDataFrame(Seq(
-      Row("06-05-02-2016,ERROR_1", 2),
-      Row("06-05-02-2016,ERROR_2", 1),
-      Row("07-05-02-2016,ERROR_2", 1)
-    ), Seq(("dateAndError", StringType, false), ("count", IntegerType, false)))
+    val expected = Seq(
+      ("06-05-02-2016,ERROR_1", 2),
+      ("06-05-02-2016,ERROR_2", 1),
+      ("07-05-02-2016,ERROR_2", 1)
+    ).toDF("dateAndError", "count")
 
     val erroneousRecords = MotelsHomeRecommendation.getErroneousRecords(rawBids)
+    
     dataFrameUtils.assertEquals(expected, erroneousRecords)
   }
   
@@ -91,12 +90,10 @@ class MotelsHomeRecommendationTest {
 
 object MotelsHomeRecommendationTest {
   var sc: SparkContext = null
-  var sqlContext: HiveContext = null
 
   @BeforeClass
   def beforeTests() = {
     sc = new SparkContext(new SparkConf().setMaster("local[2]").setAppName("motels-home-recommendation test"))
-    sqlContext = new HiveContext(sc)
   }
 
   @AfterClass

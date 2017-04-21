@@ -1,7 +1,7 @@
 package com.epam.hubd.spark.scala.sql.homework
 
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
-import org.joda.time.format.DateTimeFormat
+import java.time.format.DateTimeFormatter
 
 object Constants {
 
@@ -14,6 +14,6 @@ object Constants {
 
   val TARGET_LOSAS = Seq("US", "CA", "MX")
 
-  val INPUT_DATE_FORMAT = DateTimeFormat.forPattern("HH-dd-MM-yyyy")
-  val OUTPUT_DATE_FORMAT = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm")
+  val INPUT_DATE_FORMAT = DateTimeFormatter.ofPattern("HH-dd-MM-yyyy")
+  val OUTPUT_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 }
