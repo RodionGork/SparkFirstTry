@@ -7,6 +7,7 @@ import org.apache.spark.sql.types.{StructType, StructField, AtomicType}
 import com.holdenkarau.spark.testing.RDDComparisons
 
 import org.scalatest.exceptions.TestFailedException
+import org.junit.Assert
 
 class DataFrameTestUtils(val sc: SparkContext, val sqlContext: HiveContext) {
 
@@ -20,7 +21,7 @@ class DataFrameTestUtils(val sc: SparkContext, val sqlContext: HiveContext) {
       RDDComparisons.assertRDDEquals(expectedRdd, actualRdd)
     } catch {
       case _ : TestFailedException =>
-        throw new RuntimeException("DataFrames are not equal:\nexpected =\n"
+        Assert.fail("DataFrames are not equal:\nexpected =\n"
             + expectedRdd.collect.toList
             + "\nactual =\n"
             + actualRdd.collect.toList)

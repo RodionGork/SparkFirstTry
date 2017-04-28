@@ -3,6 +3,7 @@ package com.epam.hubd.spark.scala.sql.homework
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.{DataFrame, UserDefinedFunction}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -65,15 +66,19 @@ object MotelsHomeRecommendation {
     val errors = rawBids.select("BidDate", "Error").where(col("Error").like("ERROR%"))
     errors.select(concat(col("BidDate"), lit(","), col("Error")).alias("dateAndError"))
         .groupBy("dateAndError").count()
+        .withColumn("de", split(col("dateAndError"), ","))
+        .select(col("de").getItem(0).as("BidDate"), col("de").getItem(1).as("Error"), col("count"))
   }
   
   def getBidsSplit(rawBids: DataFrame): DataFrame = {
     val filteredBids = rawBids.where(!col("Error").like("ERROR%"))
-    val bidsUS = filteredBids.select(col("MotelID"), col("BidDate"), col("US").alias("Price").cast(DoubleType)).withColumn("LoSa", lit("US"))
-    val bidsMX = filteredBids.select(col("MotelID"), col("BidDate"), col("MX").alias("Price").cast(DoubleType)).withColumn("LoSa", lit("MX"))
-    val bidsCA = filteredBids.select(col("MotelID"), col("BidDate"), col("CA").alias("Price").cast(DoubleType)).withColumn("LoSa", lit("CA"))
+    val bidsUS = filteredBids.select(col("MotelID"), col("BidDate"), col("US").alias("Price")).withColumn("LoSa", lit("US"))
+    val bidsMX = filteredBids.select(col("MotelID"), col("BidDate"), col("MX").alias("Price")).withColumn("LoSa", lit("MX"))
+    val bidsCA = filteredBids.select(col("MotelID"), col("BidDate"), col("CA").alias("Price")).withColumn("LoSa", lit("CA"))
 
-    bidsUS.unionAll(bidsMX).unionAll(bidsCA).where(col("Price").isNotNull)
+    bidsUS.unionAll(bidsMX).unionAll(bidsCA)
+        .withColumn("Price", col("Price").cast(DoubleType))
+        .where(col("Price").isNotNull)
   }
   
   def getExchangeRates(sqlContext: HiveContext, exchPath: String): DataFrame = {
@@ -88,8 +93,17 @@ object MotelsHomeRecommendation {
   }
   
   def getMaxBids(bids: DataFrame): DataFrame = {
-    val bidsMax = bids.groupBy("MotelID", "BidDate").agg(max("Price").alias("Price"))
-    bids.join(bidsMax, Seq("MotelID", "BidDate", "Price"))
+    val maxOnPrice = max(col("Price")).over(Window.partitionBy(col("MotelID"), col("BidDate")))
+    val bids0 = bids.withColumn("MaxPrice", maxOnPrice).where(col("Price") >= col("MaxPrice")).drop("MaxPrice")
+    /*
+    // damn, this is not needed - unlike previous HW this one do not require choosing only one LoSa of equal
+    
+    val losaOrder = udf((s:String) => "CA MX US".indexOf(s))
+    val maxOnLosa = max(col("orderLosa")).over(Window.partitionBy(col("MotelID"), col("BidDate")))
+    bids0.withColumn("orderLosa", losaOrder(col("LoSa"))).withColumn("bestLosa", maxOnLosa)
+      .where(col("bestLosa") <= col("orderLosa")).drop("orderLosa").drop("bestLosa")
+    */
+    return bids0
   }
   
   def getBids(rawBids: DataFrame, exchangeRates: DataFrame): DataFrame = {
@@ -111,5 +125,6 @@ object MotelsHomeRecommendation {
     val dateFormatUdf = udf((s: String) =>
         Constants.OUTPUT_DATE_FORMAT.format(Constants.INPUT_DATE_FORMAT.parse(s)))
     bids.join(motels, "MotelID").withColumn("BidDate", dateFormatUdf(col("BidDate")))
+        .select("MotelID", "MotelName", "BidDate", "LoSa", "Price")
   }
 }

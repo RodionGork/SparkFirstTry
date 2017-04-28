@@ -1,3 +1,5 @@
+// bin/spark-shell --packages com.databricks:spark-csv_2.10:1.5.0
+
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.functions._
 import java.time.format.DateTimeFormatter
@@ -29,9 +31,18 @@ val dateFormatUdf = udf((s: String) => DateFormats.OUTPUT_DATE_FORMAT.format(Dat
 
 val bidsUsd = bidsAndRates.withColumn("Price", col("Price") * col("Rate")).drop("ExchDate").drop("Rate").withColumn("BidDate", dateFormatUdf(col("BidDate")))
 
+/*
 val bidsMax = bids.groupBy("MotelID", "BidDate").agg(max("Price").alias("Price"))
-
 val bids = bids.join(bidsMax, Seq("MotelID", "BidDate", "Price"))
+*/
+
+val maxOnPrice = max(col("Price")).over(Window.partitionBy(col("MotelID"), col("BidDate")))
+val bids0 = bidsUsd.withColumn("MaxPrice", maxOnPrice).where(col("Price") >= col("MaxPrice")).drop("MaxPrice").show()
+
+val losaOrder = udf((s:String) => "CA MX US".indexOf(s))
+val maxOnLosa = max(col("orderLosa")).over(Window.partitionBy(col("MotelID"), col("BidDate")))
+val bids = bids0.withColumn("orderLosa", losaOrder(col("LoSa"))).withColumn("bestLosa", maxOnLosa)
+    .where(col("bestLosa") >= col("orderLosa")).drop("orderLosa").drop("bestLosa")
 
 val motels = sqlContext.read.parquet(motelsPath).select("MotelID", "MotelName")
 
